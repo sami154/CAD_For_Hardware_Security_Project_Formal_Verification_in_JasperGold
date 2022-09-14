@@ -1,0 +1,4 @@
+module bind_mod();
+bind aes_128
+  property_aes p1_aes (.*);
+endmodule

@@ -1,0 +1,109 @@
+module property_aes (clk, state, key, out);
+    input          clk;
+    input  [127:0] state, key;
+    input [127:0] out;
+
+//This property checks whether the plain text and the cipher text are same or not. They should not be the same.
+property p1;
+	@(posedge clk) state != out;
+endproperty
+property_p1: assert property (p1);
+
+//This property checks whether the ciphertext and the key is same or not. They should not be the same.
+property p2;
+	@(posedge clk) key != out;
+endproperty
+property_p2: assert property (p2);
+
+//This property checks that the hamming distance between the key and the encrypted message is greater or equal to half of the key/plain text size.
+property p3;
+        @(posedge clk) $countones(key^out)>= 64;
+endproperty
+property_p3: assert property (p3);
+
+
+//These properties check the the key generation from the user key to intermediate key. 
+property p4;
+	@(posedge clk) $changed(aes_128.k0) |=> (aes_128.k1[127:96] == $past(aes_128.a1.k0a ^ aes_128.a1.k4a));
+endproperty
+property_p4: assert property(p4);
+
+property p5;
+	@(posedge clk) $changed(aes_128.k0) |=> (aes_128.k1[95:64] == $past(aes_128.a1.k1a ^ aes_128.a1.k4a));
+endproperty
+property_p5: assert property(p5);
+
+property p6;
+	@(posedge clk) $changed(aes_128.k0) |=> (aes_128.k1[63:32] == $past(aes_128.a1.k2a ^ aes_128.a1.k4a));
+endproperty
+property_p6: assert property(p6);
+
+property p7;
+	@(posedge clk) $changed(aes_128.k0) |=> (aes_128.k1[31:0] == $past(aes_128.a1.k3a ^ aes_128.a1.k4a));
+endproperty
+property_p7: assert property(p7);
+
+// This property checks that during the initial round the output should be the xor of key and first subbyte.
+property p8;
+	@(posedge clk) (state^key) |=> aes_128.s0;
+endproperty 
+property_p8: assert property (p8);
+
+// These properties check the intermmediate round results.
+property p9;
+	@(posedge clk) ((aes_128.r1.key[31:0])^(aes_128.r1.p01)^(aes_128.r1.p12)^(aes_128.r1.p23)^(aes_128.r1.p30)) |=> (aes_128.r1.state_out[31:0]);
+endproperty
+property_p9: assert property (p9);
+
+property p10;
+	@(posedge clk) ((aes_128.r1.key[63:32])^(aes_128.r1.p02)^(aes_128.r1.p13)^(aes_128.r1.p20)^(aes_128.r1.p31)) |=> (aes_128.r1.state_out[63:32]);
+endproperty
+property_p10: assert property (p10);
+
+property p11;
+	@(posedge clk) ((aes_128.r1.key[95:64])^(aes_128.r1.p03)^(aes_128.r1.p10)^(aes_128.r1.p21)^(aes_128.r1.p32)) |=> (aes_128.r1.state_out[95:64]);
+endproperty
+property_p11: assert property (p11);
+
+property p12;
+	@(posedge clk) ((aes_128.r1.key[127:96])^(aes_128.r1.p00)^(aes_128.r1.p11)^(aes_128.r1.p22)^(aes_128.r1.p33)) |=> (aes_128.r1.state_out[127:96]);
+endproperty
+property_p12: assert property (p12);
+	
+// This property checks the hamming distance for each round. It should increase with the rounds.
+
+property p13;
+        @(posedge clk) $countones(r4.state_out^r1.state_out) > $countones(r3.state_out^r1.state_out) > $countones(r2.state_out^r1.state_out);
+endproperty
+property_p13: assert property (p13);
+
+//This property checks that the intermediate results should be stable for 2 cycles.
+property p14;
+	@(posedge clk) ##1 ($changed(r1.state_out)) |=> ($stable (r1.state_out) && $changed(r2.state_out)[*2]);
+endproperty
+property_p14: assert property (p14);
+
+//This property checks that the computation should take 20 additional cycle for each key change to get the final result.
+property p15;
+        @(posedge clk)  ##1(key) ##21 $changed(out);
+endproperty
+property_p15: assert property (p15);
+
+//No intermmediate round of encryption should be bypassed
+
+property p16;
+        @(posedge clk)  ##1 $changed(r1.state_in)##3 $changed(r2.state_in)##5 $changed(r3.state_in) ##7 $changed(r4.state_in) ##9 $changed(r5.state_in) ##11 $changed(r6.state_in) ##13 $changed(r7.state_in) ##15 $changed(r8.state_in) ##17 $changed(r9.state_in) ## 19 $changed(rf.state_in) ##21 $changed(out);
+endproperty
+property_p16: assert property (p16);
+
+
+
+
+
+
+
+
+
+
+
+endmodule
